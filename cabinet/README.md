@@ -5,7 +5,7 @@
 
 [![Rust](https://img.shields.io/badge/rust-1.72%2B-orange)](https://www.rust-lang.org)
 [![Python](https://img.shields.io/badge/python-3.8%2B-blue)](https://www.python.org)
-[![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-green)](LICENSE)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 ---
 
