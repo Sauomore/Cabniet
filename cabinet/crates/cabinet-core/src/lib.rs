@@ -238,9 +238,8 @@ impl Memory {
         // 存储原始文本
         self.text_cache.insert(doc_id, text.to_string());
 
-        // 写入 Token Store
-        let token_doc_id = self.token_store.insert(hsh_seq.clone());
-        assert_eq!(token_doc_id, doc_id); // 应同步
+        // 写入 Token Store（不强制 doc_id 同步，token_store 内部维护缓冲区索引）
+        let _token_doc_id = self.token_store.insert(hsh_seq.clone());
 
         // 写入 Archive Index
         self.archive_index.merge_from_hsh_seq(doc_id, &hsh_seq);

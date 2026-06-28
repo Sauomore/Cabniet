@@ -14,7 +14,7 @@ pub struct MemorySnippet {
 
 /// 工作记忆：LRU 缓存（简化版：HashMap + 访问计数）
 pub struct WorkingMemory {
-    max_tokens: usize, // 最大 HSH 数量（不是 snippet 数量）
+    pub max_tokens: usize, // 最大 HSH 数量（不是 snippet 数量）
     cache: HashMap<HSHCode, MemorySnippet>,
     access_count: HashMap<HSHCode, u64>, // 访问计数，用于淘汰
 }

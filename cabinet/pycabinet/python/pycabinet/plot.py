@@ -104,14 +104,14 @@ _try_setup_cjk_font()
 # ---------------------------------------------------------------------------
 
 def plot_hsh_space(
-    codes: List[Tuple[str, str, int]],
+    codes,  # List[Tuple[str, str, HSHCode]] 来自 encode_detail()
     figsize: Tuple[float, float] = (8, 8),
     ax=None,
 ):
     """绘制 HSH 编码空间散点图。
 
     Args:
-        codes: [(word, pos_tag, hsh_raw), ...] 来自 ``encode_detail()``。
+        codes: [(word, pos_tag, HSHCode), ...] 来自 ``encode_detail()``。
         figsize: 当 *ax* 为 None 时创建新图形的尺寸。
         ax: 可选的 matplotlib Axes，用于嵌入子图。
 
@@ -128,9 +128,9 @@ def plot_hsh_space(
     # 按 feat 分组着色
     groups = {}
     for word, pos, hsh in codes:
-        feat = (hsh >> 16) & 0x0F
-        sim = (hsh >> 8) & 0xFF
-        abs = hsh & 0xFF
+        feat = hsh.feat
+        sim = hsh.sim
+        abs = hsh.abs
         groups.setdefault(feat, []).append((word, sim, abs))
 
     colors = plt.cm.tab20(np.linspace(0, 1, len(groups)))
@@ -344,7 +344,7 @@ def plot_feat_distribution(
         _, ax = plt.subplots(figsize=figsize)
 
     from collections import Counter
-    feat_counts = Counter((h >> 16) & 0x0F for _, _, h in codes)
+    feat_counts = Counter(h.feat for _, _, h in codes)
     labels = [f"0x{i:01X}\n{FEAT_NAMES.get(i, '')}" for i in range(16)]
     values = [feat_counts.get(i, 0) for i in range(16)]
 
