@@ -3,7 +3,7 @@
 > 面向 AI Agent 的**离散语义记忆检索系统**  
 > 用 20-bit 结构化整数替代 768 维浮点向量，让 AI 在纯 CPU 上记住、想起并解释"为什么想起这个"。
 
-[![Rust](https://img.shields.io/badge/rust-1.72%2B-orange)](https://www.rust-lang.org)
+[![PyPI](https://img.shields.io/pypi/v/cabinet-hsh)](https://pypi.org/project/cabinet-hsh/)
 [![Python](https://img.shields.io/badge/python-3.8%2B-blue)](https://www.python.org)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-green)](LICENSE)
 
@@ -48,36 +48,52 @@ Cabinet 的核心创新是 **Hierarchical Semantic Hashing (HSH)**：
 
 ## 快速开始
 
+### 从 PyPI 安装
+
+```bash
+pip install cabinet-hsh
+
+# 含绘图支持
+pip install cabinet-hsh[plot]
+
+# 含文档解析支持（PDF/Word/Excel）
+pip install cabinet-hsh[docs]
+
+# 全量安装
+pip install cabinet-hsh[plot,docs]
+```
+
 ### 从源码安装
 
 ```bash
 # 克隆仓库
-git clone https://github.com/Sauomore/Cabniet.git
-cd Cabniet/cabinet
+git clone https://github.com/Sauomore/Cabinet.git
+cd Cabinet/cabinet
 
 # 编译 Python 绑定（需要 Rust + maturin）
 pip install maturin
 maturin build --release
-pip install target/wheels/pycabinet-0.1.0-*.whl
-
-# 可选：安装绘图支持
-pip install matplotlib
+pip install target/wheels/cabinet_hsh-0.1.1-*.whl
 ```
 
-### Python 使用
+---
+
+## 使用指南
+
+### 基础编码与检索
 
 ```python
 import pycabinet
-from pycabinet.plot import plot_hsh_space
+from pycabinet import Encoder, Memory
 
 # 1. 编码可视化
-enc = pycabinet.Encoder()
+enc = Encoder()
 codes = enc.encode_detail("用户明天下午3点开会，准备PPT。")
 for w, p, c in codes:
     print(f"{w}({p}) → feat=0x{c.feat:01X}, sim=0x{c.sim:02X}, abs=0x{c.abs:02X}")
 
 # 2. 记忆库操作
-mem = pycabinet.Memory(
+mem = Memory(
     path="./agent_memory.db",
     precision="light",
     pos_threshold=50,
@@ -103,6 +119,69 @@ print(f"文档数: {stats.doc_count}, 精度: {stats.precision}")
 mem.snapshot("./backup.db")
 mem.close()
 ```
+
+### 文档解析（PDF/Word/Excel/txt/md/csv）
+
+```python
+from pycabinet import document_parser, Memory
+
+# 解析 PDF 文档
+paragraphs = document_parser.parse_document("./report.pdf")
+
+# 批量插入到记忆库
+mem = Memory(path="./agent.db")
+for text in paragraphs:
+    if len(text) > 10:
+        mem.insert(text)
+
+# 或一行搞定
+count = document_parser.batch_insert_from_file(mem, "./report.pdf")
+print(f"已插入 {count} 段")
+```
+
+支持格式：
+| 格式 | 扩展名 | 说明 |
+|------|--------|------|
+| PDF | `.pdf` | pdfplumber 逐页提取 |
+| Word | `.docx` / `.doc` | python-docx 段落提取 |
+| Excel | `.xlsx` / `.xls` | openpyxl 逐单元格提取 |
+| 文本 | `.txt` / `.md` / `.rst` | 按行切分 |
+| CSV | `.csv` | 逐单元格提取 |
+
+### 上下文解码（返回整句/前后词/前后句）
+
+```python
+from pycabinet import decode_context
+
+results = mem.query("会议准备", top_k=5)
+for r in results:
+    # 返回整段（默认）
+    print("整段:", decode_context(mem, r, mode="paragraph"))
+    
+    # 返回包含匹配词的整句话
+    print("整句:", decode_context(mem, r, mode="sentence"))
+    
+    # 返回前后 3 个词（含匹配词本身）
+    print("前后词:", decode_context(mem, r, mode="window", window_size=3))
+    
+    # 仅返回匹配词前 2 个词
+    print("前词:", decode_context(mem, r, mode="before", window_size=2))
+    
+    # 仅返回匹配词后 2 个词
+    print("后词:", decode_context(mem, r, mode="after", window_size=2))
+    
+    # 返回前后各 1 句话
+    print("前后句:", decode_context(mem, r, mode="window_sent", window_size=1))
+```
+
+| 模式 | 说明 | 示例 |
+|------|------|------|
+| `paragraph` | 返回整段文档（默认） | 完整段落 |
+| `sentence` | 返回包含匹配词的整句话 | 逗号/句号分隔 |
+| `window` | 返回前后 `window_size` 个词 | "前后词" |
+| `before` | 仅返回匹配词前 `window_size` 个词 | "前词" |
+| `after` | 仅返回匹配词后 `window_size` 个词 | "后词" |
+| `window_sent` | 返回前后 `window_size` 句话 | 语义窗口 |
 
 ### 可编程可视化（matplotlib）
 
@@ -200,8 +279,10 @@ cabinet/
 ├── pycabinet/                  # PyO3 Python 绑定
 │   ├── src/lib.rs             # PyO3 扩展：Memory / Encoder / HSHCode / Stats
 │   ├── python/pycabinet/      # Python 纯代码
-│   │   ├── __init__.py        # 核心导出
-│   │   └── plot.py            # matplotlib 可编程可视化（6 个函数）
+│   │   ├── __init__.py        # 核心导出 + 延迟加载
+│   │   ├── plot.py            # matplotlib 可编程可视化（6 个函数）
+│   │   ├── document_parser.py # 文档解析（PDF/Word/Excel/txt/csv）
+│   │   └── context_decoder.py # 上下文解码（6 种模式）
 │   ├── Cargo.toml
 │   └── pyproject.toml         # PyPI 包配置（maturin）
 ├── examples/                   # 示例代码
@@ -214,7 +295,7 @@ cabinet/
 ├── paper/                      # LaTeX 学术论文（HSH 定理 + 对比实验）
 │   └── cabinet_paper.tex
 ├── Cargo.toml                  # Workspace 根配置
-└── pyproject.toml              # Python 包根配置（可选依赖 plot/gui/dev）
+└── pyproject.toml              # Python 包根配置（可选依赖 plot/docs/gui/dev）
 ```
 
 ---
@@ -248,8 +329,8 @@ cabinet/
 
 ```bash
 # 克隆仓库
-git clone https://github.com/Sauomore/Cabniet.git
-cd Cabniet/cabinet
+git clone https://github.com/Sauomore/Cabinet.git
+cd Cabinet/cabinet
 
 # 运行 Rust 测试
 cargo test --workspace
@@ -270,7 +351,7 @@ maturin develop
 
 ## 技术路线
 
-- **MVP v0.1.0（当前）**：Light 精度、SQLite 后端、硬编码 Router、jieba 分词、可编程 matplotlib 可视化
+- **v0.1.1（当前）**：Light 精度、SQLite 后端、硬编码 Router、文档解析、上下文解码、matplotlib 可视化
 - **v0.5**：Hybrid 精度（热桶保留残差）、RelRouter MLP（ONNX）、SIMD 加速
 - **v1.0**：RocksDB 后端、自定义词典、列族映射、SST 快照、真实 BERT 向量 + 离线 K-means 聚类
 
