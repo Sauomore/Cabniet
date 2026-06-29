@@ -33,7 +33,8 @@ class _LazyPlot:
     """延迟加载 plot 模块，仅在首次访问时导入 matplotlib。"""
 
     def __getattr__(self, name: str):
-        from pycabinet import plot as _plot_module
+        import importlib
+        _plot_module = importlib.import_module('pycabinet.plot')
         return getattr(_plot_module, name)
 
 
@@ -45,7 +46,8 @@ class _LazyDocParser:
     """延迟加载 document_parser 模块。"""
 
     def __getattr__(self, name: str):
-        from pycabinet import document_parser as _dp_module
+        import importlib
+        _dp_module = importlib.import_module('pycabinet.document_parser')
         return getattr(_dp_module, name)
 
 
