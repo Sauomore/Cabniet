@@ -13,6 +13,8 @@ pub enum EncodeError {
     MappingNotLoaded,
     /// 无法分配相似码（超出范围）
     SimOutOfRange,
+    /// 无法分配相似码（超出 20-bit 范围）
+    Sim32OutOfRange,
     /// 无法分配绝对码（溢出严重）
     AbsOverflow,
     /// IO 错误
@@ -29,6 +31,7 @@ impl fmt::Display for EncodeError {
             EncodeError::SeedTableNotLoaded => write!(f, "种子表未加载"),
             EncodeError::MappingNotLoaded => write!(f, "词映射表未加载"),
             EncodeError::SimOutOfRange => write!(f, "相似码超出 0-255 范围"),
+            EncodeError::Sim32OutOfRange => write!(f, "相似码超出 20-bit 范围（0-1,048,575）"),
             EncodeError::AbsOverflow => write!(f, "绝对码分配溢出（该簇已满）"),
             EncodeError::Io(msg) => write!(f, "IO 错误: {}", msg),
             EncodeError::Config(msg) => write!(f, "配置错误: {}", msg),
