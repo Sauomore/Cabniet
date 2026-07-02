@@ -6,6 +6,7 @@ use crate::{
     cluster::{ClusterCenters, mock_embed},
     error::EncodeError,
     hsh_code::HSHCode,
+    hsh32::{HSHCode32, Encoder32},
     perfect_hash::{SeedTable, compute_abs},
     pos_map::{pos_to_feat, FeatureCode},
 };
@@ -218,6 +219,44 @@ impl Encoder {
     /// 设置种子表
     pub fn set_seed_table(&mut self, table: SeedTable) {
         self.seed_table = table;
+    }
+
+    /// 编码文本为 HSH-32 序列（使用 PCA + sign 量化）
+    pub fn encode_hsh32(&self, text: &str) -> Result<Vec<HSHCode32>, EncodeError> {
+        let tokens = self.jieba.tag(text, true);
+        let mut codes = Vec::with_capacity(tokens.len());
+        let encoder32 = Encoder32::new();
+
+        for token in tokens {
+            let word = token.word;
+            let pos = token.tag;
+
+            let feat = if self.common_words.contains(word) {
+                0x0E
+            } else {
+                pos_to_feat(pos)
+                    .map(|f| f.as_u8())
+                    .unwrap_or(0x0F)
+            };
+
+            let code = encoder32.encode_word(word, feat);
+            codes.push(code);
+        }
+
+        Ok(codes)
+    }
+
+    /// 编码单个词为 HSH-32
+    pub fn encode_word_hsh32(&self, word: &str, pos: &str) -> Result<HSHCode32, EncodeError> {
+        let encoder32 = Encoder32::new();
+        let feat = if self.common_words.contains(word) {
+            0x0E
+        } else {
+            pos_to_feat(pos)
+                .map(|f| f.as_u8())
+                .unwrap_or(0x0F)
+        };
+        Ok(encoder32.encode_word(word, feat))
     }
 
     /// 编码速度基准（近似）
