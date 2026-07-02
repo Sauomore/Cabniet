@@ -6,7 +6,7 @@ use cabinet_core::{
     Config, Memory, Precision, QueryOpts, QueryResult,
     MemoryStats, DrawerStats,
 };
-use cabinet_hsh::{Encoder, EncoderConfig, HSHCode};
+use cabinet_hsh::{Encoder, EncoderConfig, HSHCode, HSHCode32, Encoder32, is_antonym_default, direction_score, position_score, frequency_score, compute_score_default};
 
 // ===== HSHCode =====
 #[pyclass(name = "HSHCode")]
@@ -39,6 +39,39 @@ impl PyHSHCode {
     }
 }
 
+// ===== HSHCode32 =====
+#[pyclass(name = "HSHCode32")]
+#[derive(Clone, Copy)]
+struct PyHSHCode32 {
+    inner: HSHCode32,
+}
+
+#[pymethods]
+impl PyHSHCode32 {
+    #[new]
+    fn new(feat: u8, sim: u32, abs: u8) -> Self {
+        PyHSHCode32 { inner: HSHCode32::new(feat, sim, abs) }
+    }
+
+    #[getter]
+    fn feat(&self) -> u8 { self.inner.feat() }
+    #[getter]
+    fn sim(&self) -> u32 { self.inner.sim() }
+    #[getter]
+    fn abs(&self) -> u8 { self.inner.abs() }
+    #[getter]
+    fn raw(&self) -> u32 { self.inner.raw() }
+    #[getter]
+    fn bucket_id(&self) -> u32 { self.inner.bucket_id() }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "HSHCode32(feat=0x{:01X}, sim=0x{:05X}, abs=0x{:02X}, raw=0x{:08X})",
+            self.feat(), self.sim(), self.abs(), self.raw()
+        )
+    }
+}
+
 // ===== Encoder =====
 #[pyclass(name = "Encoder")]
 struct PyEncoder {
@@ -64,6 +97,18 @@ impl PyEncoder {
         let results = self.inner.encode_detail(&text)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
         Ok(results.into_iter().map(|(w, p, c)| (w, p, PyHSHCode { inner: c })).collect())
+    }
+
+    fn encode_hsh32(&self, text: String) -> PyResult<Vec<PyHSHCode32>> {
+        let codes = self.inner.encode_hsh32(&text)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        Ok(codes.into_iter().map(|c| PyHSHCode32 { inner: c }).collect())
+    }
+
+    fn encode_word_hsh32(&self, word: String, pos: String) -> PyResult<PyHSHCode32> {
+        let code = self.inner.encode_word_hsh32(&word, &pos)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        Ok(PyHSHCode32 { inner: code })
     }
 }
 
@@ -210,6 +255,35 @@ impl PyMemory {
     }
 }
 
+// ===== HSH-32 辅助函数 =====
+#[pyfunction]
+fn hsh32_is_antonym(sim_a: u32, sim_b: u32, tolerance: Option<u32>) -> bool {
+    match tolerance {
+        Some(t) => cabinet_hsh::is_antonym(sim_a, sim_b, t),
+        None => is_antonym_default(sim_a, sim_b),
+    }
+}
+
+#[pyfunction]
+fn hsh32_direction_score(sim_q: u32, sim_d: u32) -> f32 {
+    direction_score(sim_q, sim_d)
+}
+
+#[pyfunction]
+fn hsh32_position_score(abs_q: u8, abs_d: u8) -> f32 {
+    position_score(abs_q, abs_d)
+}
+
+#[pyfunction]
+fn hsh32_frequency_score(freq: f32) -> f32 {
+    frequency_score(freq)
+}
+
+#[pyfunction]
+fn hsh32_compute_score(sim_q: u32, sim_d: u32, abs_q: u8, abs_d: u8, freq_d: f32) -> (f32, bool) {
+    compute_score_default(sim_q, sim_d, abs_q, abs_d, freq_d)
+}
+
 // ===== QueryResult =====
 #[pyclass(name = "QueryResult")]
 #[derive(Clone)]
@@ -257,8 +331,14 @@ fn _pycabinet(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyMemory>()?;
     m.add_class::<PyQueryResult>()?;
     m.add_class::<PyHSHCode>()?;
+    m.add_class::<PyHSHCode32>()?;
     m.add_class::<PyEncoder>()?;
     m.add_class::<PyMemoryStats>()?;
     m.add_class::<PyDrawerStats>()?;
+    m.add_wrapped(wrap_pyfunction!(hsh32_is_antonym))?;
+    m.add_wrapped(wrap_pyfunction!(hsh32_direction_score))?;
+    m.add_wrapped(wrap_pyfunction!(hsh32_position_score))?;
+    m.add_wrapped(wrap_pyfunction!(hsh32_frequency_score))?;
+    m.add_wrapped(wrap_pyfunction!(hsh32_compute_score))?;
     Ok(())
 }
